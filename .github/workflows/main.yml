@@ -31,7 +31,8 @@ jobs:
             libglib2.0-dev libgtk-4-dev libadwaita-1-dev \
             libsndfile-dev libsamplerate0-dev libfftw3-dev \
             libjack-jackd2-dev libasound2-dev librubberband-dev \
-            libyaml-dev libzstd-dev libpcre2-dev git python3-pip
+            libyaml-dev libzstd-dev libpcre2-dev git python3-pip \
+            gettext
 
       - name: Configure
         run: meson setup build --prefix=/usr --buildtype=release
