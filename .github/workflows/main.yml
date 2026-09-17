@@ -104,6 +104,12 @@ jobs:
           meson build -Ddistro=windows-msys
           ninja -C build run-mingw-lilv mingw-carla-ucrt64-build mingw-carla-mingw32-build run-mingw-libpanel
 
+      - name: Patch meson.build dbghelp linking bug (upstream oversight)
+        run: |
+          cd /c/src/zrythm
+          sed -i "s/    cc.find_library ('dbghelp')/    dbg_help_lib = cc.find_library ('dbghelp')/" meson.build
+          grep -n "dbg_help_lib = cc.find_library ('dbghelp')" meson.build
+
       - name: Replace non-ASCII chars in TRANSLATORS
         run: |
           cd /c/src/zrythm
