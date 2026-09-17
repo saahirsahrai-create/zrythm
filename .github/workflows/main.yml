@@ -9,6 +9,15 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /usr/local/lib/android /usr/local/share/powershell \
+            /usr/local/share/chromium /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -a -f 2>/dev/null || true
+          sudo apt-get clean
+          df -h /
+
       - name: Checkout (fork)
         uses: actions/checkout@v4
         with:
@@ -37,19 +46,26 @@ jobs:
             lv2-dev libdbus-1-dev libserd-dev libsord-dev \
             libsratom-dev liblilv-dev libgtksourceview-5-dev \
             libchromaprint-dev libxxhash-dev vamp-plugin-sdk \
-            libcurl4-openssl-dev sassc libboost-dev \
+            libcurl4-openssl-dev sassc libboost-dev patchelf \
             python3-pyqt5.qtsvg python3-rdflib pyqt5-dev-tools \
             libmagic-dev liblo-dev libx11-dev libxcursor-dev \
             libxext-dev libgtk-3-dev qtbase5-dev libfluidsynth-dev
+          sudo apt-get clean
 
-      - name: Build & install Carla (required native dep, not a meson subproject)
+      - name: Fetch Carla (meson wrap subproject, not in git tree)
+        run: meson subprojects download carla
+
+      - name: Build & install Carla (required native dep, not resolved by meson)
         run: |
           cd subprojects/carla
-          make -j$(nproc)
+          make -j"$(nproc)"
           sudo make install PREFIX=/usr
+          cd ../..
+          rm -rf subprojects/carla/build subprojects/carla/*.o
+          df -h /
 
       - name: Configure (system libs first, subproject fallback if any package missing)
-        run: meson setup build --prefix=/usr --buildtype=release -Dwrap_mode=default
+        run: meson setup build --prefix=/usr --buildtype=release -Dwrap_mode=default -Dstrip=true
 
       - name: Compile
         run: ninja -C build
@@ -57,13 +73,31 @@ jobs:
       - name: Install into clean destdir (no build objects)
         run: |
           DESTDIR="$PWD/package" ninja -C build install
-          find package -name "*.o" -delete
-          find package -name "*.a" -delete 2>/dev/null || true
+          find package -name "*.o" -o -name "*.a" | xargs -r rm -f
+          rm -rf build
+          df -h /
 
-      - name: Zip clean package
+      - name: Bundle runtime shared-library dependencies (self-contained, no missing .so)
+        run: |
+          BIN="package/usr/bin/zrythm"
+          LIBDIR="package/usr/lib/zrythm-bundled-libs"
+          mkdir -p "$LIBDIR"
+          for so in $(ldd "$BIN" | awk '{print $3}' | grep '^/' | sort -u); do
+            case "$so" in
+              /lib/x86_64-linux-gnu/libc.so*|/lib64/ld-linux*) continue ;;
+            esac
+            cp -n "$so" "$LIBDIR/" 2>/dev/null || true
+          done
+          patchelf --set-rpath '$ORIGIN/../lib/zrythm-bundled-libs' "$BIN" || true
+          strip --strip-unneeded "$BIN" 2>/dev/null || true
+          find package -type f -name "*.so*" -exec strip --strip-unneeded {} \; 2>/dev/null || true
+
+      - name: Zip clean, self-contained package
         run: |
           cd package
-          zip -r ../zrythm-v1-package.zip .
+          zip -r -9 ../zrythm-v1-package.zip .
+          cd ..
+          du -sh zrythm-v1-package.zip
 
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
