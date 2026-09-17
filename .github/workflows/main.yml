@@ -77,12 +77,11 @@ jobs:
 
       - name: Patch mingw-w64-headers stralign.h bug (ua_wcschr ambiguous declaration)
         run: |
-          find / -name "stralign.h" 2>/dev/null | while read -r f; do
+          find /ucrt64 /mingw32 /mingw64 -name "stralign.h" 2>/dev/null | while read -r f; do
             echo "Patching: $f"
-            grep -n "_WConst_" "$f" || true
             sed -i -E 's/#if defined\(__cplusplus\) && defined\(_WConst_[Rr]eturn\)/#if 0/' "$f"
-            grep -n "^#if 0" "$f" || true
           done
+          true
 
       - name: Move repo into MSYS2-native path
         run: |
