@@ -1,0 +1,50 @@
+name: Build Zrythm v1 Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout (fork)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: v1.0.0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential meson ninja-build pkg-config \
+            libglib2.0-dev libgtk-4-dev libadwaita-1-dev \
+            libsndfile-dev libsamplerate0-dev libfftw3-dev \
+            libjack-jackd2-dev libasound2-dev librubberband-dev \
+            libyaml-dev libzstd-dev libpcre2-dev git python3-pip
+
+      - name: Configure
+        run: meson setup build --prefix=/usr --buildtype=release
+
+      - name: Compile
+        run: ninja -C build
+
+      - name: Install into clean destdir (no build objects)
+        run: |
+          DESTDIR="$PWD/package" ninja -C build install
+          # strip anything build-related, keep only installed app+deps
+          find package -name "*.o" -delete
+          find package -name "*.a" -delete 2>/dev/null || true
+
+      - name: Zip clean package
+        run: |
+          cd package
+          zip -r ../zrythm-v1-package.zip .
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zrythm-v1-package
+          path: zrythm-v1-package.zip
