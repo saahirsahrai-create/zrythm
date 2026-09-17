@@ -74,6 +74,7 @@ jobs:
             mingw-w64-ucrt-x86_64-graphene
             mingw-w64-ucrt-x86_64-libsass
             mingw-w64-ucrt-x86_64-sassc
+            mingw-w64-ucrt-x86_64-libcyaml
 
       - name: Move repo into MSYS2-native path
         run: |
@@ -108,7 +109,7 @@ jobs:
         run: |
           cd /c/src/zrythm
           sed -i -e "s|'-lssp'|'-Wl,-allow-multiple-definition'|g" meson.build
-          meson build -Dcarla_binaries_dir_32bit=D:/a/_temp/msys64/mingw32/lib/carla -Db_lto=false -Dmanpage=false -Dtests=false
+          meson build -Dcarla_binaries_dir_32bit=D:/a/_temp/msys64/mingw32/lib/carla -Db_lto=false -Dmanpage=false -Dtests=false -Dwrap_mode=default
 
       - name: Compile
         run: ninja -C /c/src/zrythm/build
