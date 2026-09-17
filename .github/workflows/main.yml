@@ -133,6 +133,30 @@ jobs:
           DESTDIR=/c/src/package ninja -C build install
           find /c/src/package -name "*.o" -o -name "*.a" | xargs -r rm -f
 
+      - name: Bundle runtime DLL dependencies (self-contained, no missing .dll)
+        run: |
+          BINDIR="/c/src/package/ucrt64/bin"
+          if [ ! -d "$BINDIR" ]; then
+            BINDIR=$(dirname "$(find /c/src/package -iname 'zrythm.exe' | head -1)")
+          fi
+          echo "Binary dir: $BINDIR"
+          added=1
+          while [ "$added" -ne 0 ]; do
+            added=0
+            for bin in "$BINDIR"/*.exe "$BINDIR"/*.dll; do
+              [ -f "$bin" ] || continue
+              for dll in $(ldd "$bin" 2>/dev/null | grep -i '/ucrt64/bin/' | awk '{print $3}'); do
+                name=$(basename "$dll")
+                if [ ! -f "$BINDIR/$name" ]; then
+                  cp "$dll" "$BINDIR/" && added=1
+                  echo "Bundled: $name"
+                fi
+              done
+            done
+          done
+          echo "--- final bin dir ---"
+          ls "$BINDIR"
+
       - name: Zip clean package
         run: |
           cd /c/src/package
