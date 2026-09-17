@@ -86,8 +86,9 @@ jobs:
 
       - name: Disable PKGBUILD check() phase (avoids flaky mingw test failures)
         run: |
-          sed -i "s/^BUILDENV=.*/BUILDENV=(!distcc color !ccache !check)/" /etc/makepkg.conf
-          cat /etc/makepkg.conf | grep BUILDENV
+          sed -i "s/^BUILDENV=.*/BUILDENV=(!distcc color !ccache !check !sign)/" /etc/makepkg.conf
+          sed -i "s/^BUILDENV=.*/BUILDENV=(!distcc color !ccache !check !sign)/" /etc/makepkg_mingw.conf
+          grep BUILDENV /etc/makepkg.conf /etc/makepkg_mingw.conf
 
       - name: Build prebuilt deps (lilv, carla, libpanel for mingw)
         run: |
