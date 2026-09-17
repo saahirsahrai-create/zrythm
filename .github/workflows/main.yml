@@ -1,106 +1,126 @@
-name: Build Zrythm v1 Package
+name: Build Zrythm v1 Windows Package
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
     steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
-            /usr/local/lib/android /usr/local/share/powershell \
-            /usr/local/share/chromium /opt/hostedtoolcache/CodeQL
-          sudo docker image prune -a -f 2>/dev/null || true
-          sudo apt-get clean
-          df -h /
-
-      - name: Checkout (fork)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          path: zrythm
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Checkout v1.0.0 tag
+      - name: Checkout v1.0.0 tag (fork)
+        shell: bash
         run: |
+          cd zrythm
           git remote add upstream https://github.com/zrythm/zrythm.git
           git fetch upstream tag v1.0.0
           git checkout v1.0.0
-          git submodule update --init --recursive
 
-      - name: Install build dependencies (verified list)
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            zip
+            unzip
+            base-devel
+            tree
+            guile
+            libguile-devel
+            mingw-w64-i686-toolchain
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-libsamplerate
+            mingw-w64-ucrt-x86_64-fftw
+            mingw-w64-ucrt-x86_64-ffmpeg
+            mingw-w64-ucrt-x86_64-libyaml
+            mingw-w64-ucrt-x86_64-libsndfile
+            mingw-w64-ucrt-x86_64-rubberband
+            mingw-w64-ucrt-x86_64-boost
+            mingw-w64-ucrt-x86_64-dlfcn
+            mingw-w64-ucrt-x86_64-SDL2
+            mingw-w64-ucrt-x86_64-chromaprint
+            mingw-w64-ucrt-x86_64-graphviz
+            mingw-w64-ucrt-x86_64-cantarell-fonts
+            mingw-w64-ucrt-x86_64-gtksourceview5
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-make
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-portaudio
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-python-setuptools
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python-pip
+            mingw-w64-ucrt-x86_64-libadwaita
+            mingw-w64-ucrt-x86_64-meson
+            mingw-w64-ucrt-x86_64-python3
+            mingw-w64-ucrt-x86_64-gtk-doc
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-adwaita-icon-theme
+            mingw-w64-ucrt-x86_64-curl-winssl
+            mingw-w64-ucrt-x86_64-pcre2
+            mingw-w64-ucrt-x86_64-xxhash
+            mingw-w64-ucrt-x86_64-vamp-plugin-sdk
+            mingw-w64-ucrt-x86_64-json-glib
+            mingw-w64-ucrt-x86_64-iconv
+            mingw-w64-ucrt-x86_64-graphene
+            mingw-w64-ucrt-x86_64-libsass
+            mingw-w64-ucrt-x86_64-sassc
+
+      - name: Move repo into MSYS2-native path
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential meson ninja-build pkg-config cmake flex bison libfl-dev \
-            libglib2.0-dev libgtk-4-dev libadwaita-1-dev \
-            libsndfile-dev libsamplerate0-dev libfftw3-dev \
-            libjack-jackd2-dev libasound2-dev librubberband-dev \
-            libyaml-dev libzstd-dev libpcre2-dev git python3-pip \
-            gettext help2man guile-2.2 libxml2-utils xdg-utils \
-            libcyaml-dev libpulse-dev libsoxr-dev libpanel-dev \
-            lv2-dev libdbus-1-dev libserd-dev libsord-dev \
-            libsratom-dev liblilv-dev libgtksourceview-5-dev \
-            libchromaprint-dev libxxhash-dev vamp-plugin-sdk \
-            libcurl4-openssl-dev sassc libboost-dev patchelf \
-            python3-pyqt5.qtsvg python3-rdflib pyqt5-dev-tools \
-            libmagic-dev liblo-dev libx11-dev libxcursor-dev \
-            libxext-dev libgtk-3-dev qtbase5-dev libfluidsynth-dev
-          sudo apt-get clean
+          mkdir /c/src
+          MSYS=winsymlinks:native mv /d/a/*/zrythm/zrythm /c/src/zrythm 2>/dev/null || \
+          MSYS=winsymlinks:native mv "$GITHUB_WORKSPACE/zrythm" /c/src/zrythm
+          cd /c/src
+          git clone https://gitlab.zrythm.org/zrythm/zrythm-builds
+          git clone https://gitlab.zrythm.org/zrythm/zrythm-installer
 
-      - name: Fetch Carla (meson wrap subproject, not in git tree)
-        run: meson subprojects download carla || true
-
-      - name: Build & install Carla (required native dep, not resolved by meson)
+      - name: Build prebuilt deps (lilv, carla, libpanel for mingw)
         run: |
-          cd subprojects/carla
-          make -j"$(nproc)"
-          sudo make install PREFIX=/usr
-          cd ../..
-          rm -rf subprojects/carla/build subprojects/carla/*.o
-          df -h /
+          cd /c/src/zrythm-installer
+          meson build -Ddistro=windows-msys
+          ninja -C build run-mingw-lilv mingw-carla-ucrt64-build mingw-carla-mingw32-build run-mingw-libpanel
 
-      - name: Configure (system libs first, subproject fallback if any package missing)
-        run: meson setup build --prefix=/usr --buildtype=release -Dwrap_mode=default -Dstrip=true
+      - name: Replace non-ASCII chars in TRANSLATORS
+        run: |
+          cd /c/src/zrythm
+          iconv -c -f utf-8 -t ascii//TRANSLIT TRANSLATORS > TRANSLATORS2 || true
+          rm -f TRANSLATORS
+          mv TRANSLATORS2 TRANSLATORS
+          sed -i -e "s|\"|'|g" TRANSLATORS
+
+      - name: Configure
+        run: |
+          cd /c/src/zrythm
+          sed -i -e "s|'-lssp'|'-Wl,-allow-multiple-definition'|g" meson.build
+          meson build -Dcarla_binaries_dir_32bit=D:/a/_temp/msys64/mingw32/lib/carla -Db_lto=false -Dmanpage=false -Dtests=false
 
       - name: Compile
-        run: ninja -C build
+        run: ninja -C /c/src/zrythm/build
 
-      - name: Install into clean destdir (no build objects)
+      - name: Install into clean destdir (no build objects, real .exe)
         run: |
-          DESTDIR="$PWD/package" ninja -C build install
-          find package -name "*.o" -o -name "*.a" | xargs -r rm -f
-          rm -rf build
-          df -h /
+          cd /c/src/zrythm
+          DESTDIR=/c/src/package ninja -C build install
+          find /c/src/package -name "*.o" -o -name "*.a" | xargs -r rm -f
 
-      - name: Bundle runtime shared-library dependencies (self-contained, no missing .so)
+      - name: Zip clean package
         run: |
-          BIN="package/usr/bin/zrythm"
-          LIBDIR="package/usr/lib/zrythm-bundled-libs"
-          mkdir -p "$LIBDIR"
-          for so in $(ldd "$BIN" | awk '{print $3}' | grep '^/' | sort -u); do
-            case "$so" in
-              /lib/x86_64-linux-gnu/libc.so*|/lib64/ld-linux*) continue ;;
-            esac
-            cp -n "$so" "$LIBDIR/" 2>/dev/null || true
-          done
-          patchelf --set-rpath '$ORIGIN/../lib/zrythm-bundled-libs' "$BIN" || true
-          strip --strip-unneeded "$BIN" 2>/dev/null || true
-          find package -type f -name "*.so*" -exec strip --strip-unneeded {} \; 2>/dev/null || true
-
-      - name: Zip clean, self-contained package
-        run: |
-          cd package
-          zip -r -9 ../zrythm-v1-package.zip .
-          cd ..
-          du -sh zrythm-v1-package.zip
+          cd /c/src/package
+          zip -r -9 /c/src/zrythm-v1-windows-package.zip .
+          du -sh /c/src/zrythm-v1-windows-package.zip
 
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zrythm-v1-package
-          path: zrythm-v1-package.zip
+          name: zrythm-v1-windows-package
+          path: C:/src/zrythm-v1-windows-package.zip
