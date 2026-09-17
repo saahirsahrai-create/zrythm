@@ -53,7 +53,7 @@ jobs:
           sudo apt-get clean
 
       - name: Fetch Carla (meson wrap subproject, not in git tree)
-        run: meson subprojects download carla
+        run: meson subprojects download carla || true
 
       - name: Build & install Carla (required native dep, not resolved by meson)
         run: |
