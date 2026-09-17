@@ -75,6 +75,14 @@ jobs:
             mingw-w64-ucrt-x86_64-libsass
             mingw-w64-ucrt-x86_64-sassc
 
+      - name: Patch mingw-w64-headers stralign.h bug (ua_wcschr ambiguous declaration)
+        run: |
+          for f in /ucrt64/include/stralign.h /mingw32/include/stralign.h; do
+            if [ -f "$f" ]; then
+              sed -i 's/#if defined(__cplusplus) && defined(_WConst_[Rr]eturn)/#if 0/' "$f"
+            fi
+          done
+
       - name: Move repo into MSYS2-native path
         run: |
           mkdir /c/src
