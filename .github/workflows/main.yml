@@ -23,19 +23,33 @@ jobs:
           git checkout v1.0.0
           git submodule update --init --recursive
 
-      - name: Install build dependencies
+      - name: Install build dependencies (verified list)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential meson ninja-build pkg-config \
+            build-essential meson ninja-build pkg-config cmake flex bison \
             libglib2.0-dev libgtk-4-dev libadwaita-1-dev \
             libsndfile-dev libsamplerate0-dev libfftw3-dev \
             libjack-jackd2-dev libasound2-dev librubberband-dev \
             libyaml-dev libzstd-dev libpcre2-dev git python3-pip \
-            gettext
+            gettext help2man guile-2.2 libxml2-utils xdg-utils \
+            libcyaml-dev libpulse-dev libsoxr-dev libpanel-dev \
+            lv2-dev libdbus-1-dev libserd-dev libsord-dev \
+            libsratom-dev liblilv-dev libgtksourceview-5-dev \
+            libchromaprint-dev libxxhash-dev vamp-plugin-sdk \
+            libcurl4-openssl-dev sassc libboost-dev \
+            python3-pyqt5.qtsvg python3-rdflib pyqt5-dev-tools \
+            libmagic-dev liblo-dev libx11-dev libxcursor-dev \
+            libxext-dev libgtk-3-dev qtbase5-dev libfluidsynth-dev
 
-      - name: Configure
-        run: meson setup build --prefix=/usr --buildtype=release
+      - name: Build & install Carla (required native dep, not a meson subproject)
+        run: |
+          cd subprojects/carla
+          make -j$(nproc)
+          sudo make install PREFIX=/usr
+
+      - name: Configure (system libs first, subproject fallback if any package missing)
+        run: meson setup build --prefix=/usr --buildtype=release -Dwrap_mode=default
 
       - name: Compile
         run: ninja -C build
@@ -43,7 +57,6 @@ jobs:
       - name: Install into clean destdir (no build objects)
         run: |
           DESTDIR="$PWD/package" ninja -C build install
-          # strip anything build-related, keep only installed app+deps
           find package -name "*.o" -delete
           find package -name "*.a" -delete 2>/dev/null || true
 
