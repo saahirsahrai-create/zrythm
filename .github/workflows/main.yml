@@ -17,7 +17,11 @@ jobs:
           fetch-tags: true
 
       - name: Checkout v1.0.0 tag
-        run: git checkout v1.0.0 && git submodule update --init --recursive
+        run: |
+          git remote add upstream https://github.com/zrythm/zrythm.git
+          git fetch upstream tag v1.0.0
+          git checkout v1.0.0
+          git submodule update --init --recursive
 
       - name: Install build dependencies
         run: |
