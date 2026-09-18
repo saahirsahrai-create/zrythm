@@ -127,9 +127,10 @@ jobs:
       - name: Skip 32-bit Carla VST bridge (not built; provide harmless placeholders)
         run: |
           mkdir -p /mingw32/lib/carla
-          touch /mingw32/lib/carla/carla-discovery-win32.exe
-          touch /mingw32/lib/carla/carla-bridge-win32.exe
-          chmod +x /mingw32/lib/carla/carla-discovery-win32.exe /mingw32/lib/carla/carla-bridge-win32.exe
+          NATIVE_EXE=$(find /ucrt64/lib/carla -iname "carla-discovery-native.exe" | head -1)
+          cp "$NATIVE_EXE" /mingw32/lib/carla/carla-discovery-win32.exe
+          cp "$NATIVE_EXE" /mingw32/lib/carla/carla-bridge-win32.exe
+          ls -la /mingw32/lib/carla/
 
       - name: Replace non-ASCII chars in TRANSLATORS
         run: |
