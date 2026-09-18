@@ -124,13 +124,14 @@ jobs:
           sed -i "s/    cc.find_library ('dbghelp')/    dbg_help_lib = cc.find_library ('dbghelp')/" meson.build
           grep -n "dbg_help_lib = cc.find_library ('dbghelp')" meson.build
 
-      - name: Skip 32-bit Carla VST bridge (not built; provide harmless placeholders)
+      - name: Remove 32-bit Carla VST bridge requirement (not building 32-bit Carla)
         run: |
-          mkdir -p /mingw32/lib/carla
-          NATIVE_EXE=$(find /ucrt64/lib/carla -iname "carla-discovery-native.exe" | head -1)
-          cp "$NATIVE_EXE" /mingw32/lib/carla/carla-discovery-win32.exe
-          cp "$NATIVE_EXE" /mingw32/lib/carla/carla-bridge-win32.exe
-          ls -la /mingw32/lib/carla/
+          cd /c/src/zrythm
+          LINE=$(grep -n "carla_bins_dir_32bit = get_option" meson.build | cut -d: -f1)
+          echo "Anchor line: $LINE"
+          sed -i "$((LINE+1)),$((LINE+10))d" meson.build
+          echo "--- result ---"
+          sed -n "$((LINE-2)),$((LINE+3))p" meson.build
 
       - name: Replace non-ASCII chars in TRANSLATORS
         run: |
