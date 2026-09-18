@@ -158,12 +158,12 @@ jobs:
           DESTDIR=/c/src/package ninja -C build install
           find /c/src/package -name "*.o" -o -name "*.a" | xargs -r rm -f
 
-      - name: Flatten package structure (remove nested ucrt64 folder, simple bin/lib/share layout)
-        run: |
-          mv /c/src/package/ucrt64/* /c/src/package/
-          rmdir /c/src/package/ucrt64
-          echo "--- flattened top level ---"
-          ls /c/src/package
+																								  
+			  
+													
+									 
+											
+						   
 
       - name: Compile GSettings schema (DESTDIR install skips this, causes silent exit)
         run: |
@@ -180,7 +180,7 @@ jobs:
 
       - name: Bundle gdk-pixbuf SVG loader (fixes "SVG loader was not found" crash)
         run: |
-          BINDIR="/c/src/package/bin"
+          BINDIR="/c/src/package/ucrt64/bin"
           LOADER_SRC_DIR="/ucrt64/lib/gdk-pixbuf-2.0/2.10.0/loaders"
           LOADER_DST_DIR="$BINDIR/../lib/gdk-pixbuf-2.0/2.10.0/loaders"
           mkdir -p "$LOADER_DST_DIR"
@@ -197,14 +197,14 @@ jobs:
 
       - name: Bundle GLib/GIO helper executables (gdbus, gspawn helpers - used via subprocess, not linking)
         run: |
-          BINDIR="/c/src/package/bin"
+          BINDIR="/c/src/package/ucrt64/bin"
           for exe in gdbus.exe gio.exe gio-launch-desktop.exe gsettings.exe gspawn-win64-helper.exe gspawn-win64-helper-console.exe; do
             [ -f "/ucrt64/bin/$exe" ] && cp -v "/ucrt64/bin/$exe" "$BINDIR/"
           done
 
       - name: Create portable launcher (sets schema/data dirs relative to exe)
         run: |
-          BINDIR="/c/src/package/bin"
+          BINDIR="/c/src/package/ucrt64/bin"
           SCHEMA_DIR=$(dirname "$(find /c/src/package -iname "org.zrythm.Zrythm.gschema.xml" | head -1)")
           SHARE_DIR=$(dirname "$(dirname "$SCHEMA_DIR")")
           # convert /c/src/package/ucrt64/... msys path to a Windows-relative path from BINDIR
@@ -216,7 +216,7 @@ jobs:
           set "GSETTINGS_SCHEMA_DIR=%HERE%${REL_SHARE}\glib-2.0\schemas"
           set "XDG_DATA_DIRS=%HERE%${REL_SHARE}"
           set "GDK_PIXBUF_MODULE_FILE=%HERE%..\lib\gdk-pixbuf-2.0\2.10.0\loaders\loaders.cache"
-          set "GSK_RENDERER=gl"
+		  set "GSK_RENDERER=gl"					
           start "" "%HERE%zrythm.exe"
           BATEOF
           sed -i 's/^          //' "$BINDIR/zrythm-launcher.bat"
@@ -225,7 +225,7 @@ jobs:
 
       - name: Bundle runtime DLL dependencies (self-contained, no missing .dll)
         run: |
-          BINDIR="/c/src/package/bin"
+          BINDIR="/c/src/package/ucrt64/bin"
           if [ ! -d "$BINDIR" ]; then
             BINDIR=$(dirname "$(find /c/src/package -iname 'zrythm.exe' | head -1)")
           fi
@@ -249,19 +249,19 @@ jobs:
 
       - name: Bundle Carla plugin host (dlopen-loaded, not caught by ldd chain)
         run: |
-          BINDIR="/c/src/package/bin"
+          BINDIR="/c/src/package/ucrt64/bin"
           [ -d "$BINDIR" ] || BINDIR=$(dirname "$(find /c/src/package -iname 'zrythm.exe' | head -1)")
 
           # Carla installs its DLLs/plugin bridges under /ucrt64/lib/carla and /ucrt64/bin
-          LIBDIR="$BINDIR/../lib"
-          mkdir -p "$LIBDIR/carla"
+								 
+          mkdir -p "$BINDIR/carla"
           for src in /ucrt64/lib/carla /ucrt64/bin; do
             [ -d "$src" ] || continue
             find "$src" -maxdepth 2 -iname "libcarla_*.dll" -exec cp -v {} "$BINDIR/" \;
-            find "$src" -maxdepth 2 -iname "carla*.exe" -exec cp -v {} "$LIBDIR/carla/" \;
+            find "$src" -maxdepth 2 -iname "carla*.exe" -exec cp -v {} "$BINDIR/" \;
           done
           # copy the carla plugin/resources tree it needs alongside the dll
-          [ -d /ucrt64/lib/carla ] && cp -rv /ucrt64/lib/carla/* "$LIBDIR/carla/" 2>/dev/null || true
+          [ -d /ucrt64/lib/carla ] && cp -rv /ucrt64/lib/carla/* "$BINDIR/carla/" 2>/dev/null || true
 
           # resolve dependencies of the Carla DLLs we just added (2nd pass, same expansion logic)
           added=1
