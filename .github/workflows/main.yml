@@ -74,6 +74,8 @@ jobs:
             mingw-w64-ucrt-x86_64-graphene
             mingw-w64-ucrt-x86_64-libsass
             mingw-w64-ucrt-x86_64-sassc
+            mingw-w64-ucrt-x86_64-librsvg
+            mingw-w64-ucrt-x86_64-gdk-pixbuf2
 
       - name: Patch mingw-w64-headers stralign.h bug (ua_wcschr ambiguous declaration)
         run: |
@@ -158,22 +160,50 @@ jobs:
 
       - name: Compile GSettings schema (DESTDIR install skips this, causes silent exit)
         run: |
-          SCHEMA_DIR="/c/src/package/ucrt64/share/glib-2.0/schemas"
+          SCHEMA_DIR=$(dirname "$(find /c/src/package -iname "org.zrythm.Zrythm.gschema.xml" | head -1)")
+          if [ -z "$SCHEMA_DIR" ]; then
+            echo "gschema.xml not found anywhere in package! searching wider:"
+            find /c/src/package -iname "*.gschema.xml"
+            exit 1
+          fi
+          echo "Found schema dir: $SCHEMA_DIR"
           ls "$SCHEMA_DIR"
           glib-compile-schemas "$SCHEMA_DIR"
           ls "$SCHEMA_DIR"
 
+      - name: Bundle gdk-pixbuf SVG loader (fixes "SVG loader was not found" crash)
+        run: |
+          BINDIR="/c/src/package/ucrt64/bin"
+          LOADER_SRC_DIR="/ucrt64/lib/gdk-pixbuf-2.0/2.10.0/loaders"
+          LOADER_DST_DIR="$BINDIR/../lib/gdk-pixbuf-2.0/2.10.0/loaders"
+          mkdir -p "$LOADER_DST_DIR"
+          cp -v "$LOADER_SRC_DIR"/*.dll "$LOADER_DST_DIR/"
+          ls "$LOADER_DST_DIR"
+
+      - name: Bundle GLib/GIO helper executables (gdbus, gspawn helpers - used via subprocess, not linking)
+        run: |
+          BINDIR="/c/src/package/ucrt64/bin"
+          for exe in gdbus.exe gio.exe gio-launch-desktop.exe gsettings.exe gspawn-win64-helper.exe gspawn-win64-helper-console.exe; do
+            [ -f "/ucrt64/bin/$exe" ] && cp -v "/ucrt64/bin/$exe" "$BINDIR/"
+          done
+
       - name: Create portable launcher (sets schema/data dirs relative to exe)
         run: |
           BINDIR="/c/src/package/ucrt64/bin"
-          cat << 'BATEOF' | sed 's/^          //' > "$BINDIR/zrythm-launcher.bat"
+          SCHEMA_DIR=$(dirname "$(find /c/src/package -iname "org.zrythm.Zrythm.gschema.xml" | head -1)")
+          SHARE_DIR=$(dirname "$(dirname "$SCHEMA_DIR")")
+          # convert /c/src/package/ucrt64/... msys path to a Windows-relative path from BINDIR
+          REL_SHARE=$(python3 -c "import os; print(os.path.relpath('$SHARE_DIR','$BINDIR').replace('/', '\\\\'))")
+          echo "Relative share dir from bin: $REL_SHARE"
+          cat << BATEOF > "$BINDIR/zrythm-launcher.bat"
           @echo off
           set "HERE=%~dp0"
-          set "GSETTINGS_SCHEMA_DIR=%HERE%..\share\glib-2.0\schemas"
-          set "XDG_DATA_DIRS=%HERE%..\share"
-          set "GDK_PIXBUF_MODULE_FILE=%HERE%..\lib\gdk-pixbuf-2.0\2.10.0\loaders.cache"
+          set "GSETTINGS_SCHEMA_DIR=%HERE%${REL_SHARE}\glib-2.0\schemas"
+          set "XDG_DATA_DIRS=%HERE%${REL_SHARE}"
+          set "GDK_PIXBUF_MODULEDIR=%HERE%..\lib\gdk-pixbuf-2.0\2.10.0\loaders"
           start "" "%HERE%zrythm.exe"
           BATEOF
+          sed -i 's/^          //' "$BINDIR/zrythm-launcher.bat"
           echo "--- launcher content ---"
           cat "$BINDIR/zrythm-launcher.bat"
 
@@ -187,7 +217,7 @@ jobs:
           added=1
           while [ "$added" -ne 0 ]; do
             added=0
-            for bin in "$BINDIR"/*.exe "$BINDIR"/*.dll; do
+            for bin in "$BINDIR"/*.exe "$BINDIR"/*.dll "$BINDIR"/../lib/gdk-pixbuf-2.0/2.10.0/loaders/*.dll; do
               [ -f "$bin" ] || continue
               for dll in $(ldd "$bin" 2>/dev/null | grep -i '/ucrt64/bin/' | awk '{print $3}'); do
                 name=$(basename "$dll")
@@ -210,9 +240,8 @@ jobs:
           mkdir -p "$BINDIR/carla"
           for src in /ucrt64/lib/carla /ucrt64/bin; do
             [ -d "$src" ] || continue
-            find "$src" -maxdepth 2 -iname "libcarla_host-plugin*.dll" -exec cp -v {} "$BINDIR/" \;
             find "$src" -maxdepth 2 -iname "libcarla_*.dll" -exec cp -v {} "$BINDIR/" \;
-            find "$src" -maxdepth 2 -iname "carla-bridge*.exe" -exec cp -v {} "$BINDIR/" \;
+            find "$src" -maxdepth 2 -iname "carla*.exe" -exec cp -v {} "$BINDIR/" \;
           done
           # copy the carla plugin/resources tree it needs alongside the dll
           [ -d /ucrt64/lib/carla ] && cp -rv /ucrt64/lib/carla/* "$BINDIR/carla/" 2>/dev/null || true
