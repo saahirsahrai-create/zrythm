@@ -168,18 +168,25 @@ jobs:
       - name: Flatten package structure (remove nested prefix folder, simple bin/lib/share layout)
         run: |
           cd /c/src/package
-          ls -la
-          # the DESTDIR install creates one subfolder matching the meson --prefix
-          # (should be "ucrt64"); find it dynamically instead of hardcoding, in
-          # case the prefix ever differs
-          PREFIX_DIR=$(find . -maxdepth 1 -type d -name "ucrt64")
-          if [ -z "$PREFIX_DIR" ]; then
-            echo "ucrt64 not found, listing what IS here:"
-            find . -maxdepth 2
+          find . -maxdepth 6
+          # locate zrythm.exe wherever meson actually nested it (the real
+          # prefix path can resolve as either "/ucrt64/..." or the fully
+          # expanded "a/_temp/msys64/ucrt64/..." depending on how meson
+          # handles the MSYS mount alias vs its real underlying path) and
+          # flatten from its parent (the "bin" folder's parent) upward.
+          EXE_PATH=$(find . -iname "zrythm.exe" | head -1)
+          if [ -z "$EXE_PATH" ]; then
+            echo "zrythm.exe not found anywhere in package!"
             exit 1
           fi
-          mv "$PREFIX_DIR"/* .
-          rmdir "$PREFIX_DIR"
+          PREFIX_DIR=$(dirname "$(dirname "$EXE_PATH")")
+          echo "Found zrythm.exe at: $EXE_PATH"
+          echo "Resolved prefix dir: $PREFIX_DIR"
+          if [ "$PREFIX_DIR" != "." ]; then
+            mv "$PREFIX_DIR"/* .
+            # clean up now-empty parent chain
+            rmdir -p "$PREFIX_DIR" 2>/dev/null || true
+          fi
           echo "--- flattened top level ---"
           ls /c/src/package
 
