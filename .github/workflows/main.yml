@@ -93,7 +93,11 @@ jobs:
 
       - name: Install lilv/libpanel from prebuilt MSYS2 packages (avoids flaky download.drobilla.net PKGBUILD build)
         run: |
-          pacman -S --noconfirm mingw-w64-ucrt-x86_64-lilv mingw-w64-ucrt-x86_64-libpanel
+          for i in 1 2 3 4 5; do
+            pacman -Sy --noconfirm --disable-download-timeout mingw-w64-ucrt-x86_64-lilv mingw-w64-ucrt-x86_64-libpanel && break
+            echo "pacman attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
           pkg-config --modversion lilv-0
           pkg-config --modversion libpanel-1
 
