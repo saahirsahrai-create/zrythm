@@ -118,11 +118,19 @@ jobs:
       - name: Build Carla 32-bit discovery/bridge tools (needed for 32-bit plugins to avoid arch-mismatch crash)
         run: |
           cd /c/src/zrythm/subprojects/carla
-          # the i686 cross-compiler lives under /mingw32/bin, which is NOT
-          # on PATH inside a UCRT64 shell session by default
+          # the i686 cross-compiler lives under /mingw32/bin; note that MSYS2's
+          # mingw-w64-i686-binutils package names its archiver just "ar.exe"
+          # (no i686-w64-mingw32- prefix), unlike gcc/g++ which are available
+          # under both the plain and prefixed names -- use full paths for all
+          # three to avoid any PATH-ordering ambiguity with /ucrt64/bin's own
+          # (64-bit-targeting) tools of the same short names.
           export PATH="/mingw32/bin:$PATH"
-          which i686-w64-mingw32-gcc
-          make win32r AR=i686-w64-mingw32-ar CC=i686-w64-mingw32-gcc CXX=i686-w64-mingw32-g++ -j"$(nproc)"
+          ls -la /mingw32/bin/ar.exe /mingw32/bin/gcc.exe /mingw32/bin/g++.exe
+          make win32r \
+            AR=/mingw32/bin/ar.exe \
+            CC=/mingw32/bin/gcc.exe \
+            CXX=/mingw32/bin/g++.exe \
+            -j"$(nproc)"
           echo "--- 32-bit carla binaries produced ---"
           find bin -iname "*win32*"
           file bin/carla-discovery-win32.exe bin/carla-bridge-win32.exe
