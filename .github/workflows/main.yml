@@ -108,17 +108,38 @@ jobs:
 
       - name: Build & install Carla natively (real UCRT64 DLLs, matching toolchain)
         run: |
+          export PATH="/ucrt64/bin:/mingw32/bin:$PATH"
+          hash -r
+
           cd /c/src/zrythm/subprojects/carla
+
+          command -v gcc
+          command -v i686-w64-mingw32-gcc
+          i686-w64-mingw32-gcc --version
+
           make msys2fix
           make -j"$(nproc)"
           make install PREFIX=/ucrt64
+
           echo "--- installed carla files ---"
           find /ucrt64 -iname "*carla*" 2>/dev/null
 
-      - name: Build Carla 32-bit discovery/bridge tools (needed for 32-bit plugins to avoid arch-mismatch crash)
+      - name: Build Carla 32-bit discovery/bridge tools
         run: |
+          export PATH="/ucrt64/bin:/mingw32/bin:$PATH"
+          hash -r
+
           cd /c/src/zrythm/subprojects/carla
-          make win32r AR=i686-w64-mingw32-ar CC=i686-w64-mingw32-gcc CXX=i686-w64-mingw32-g++ -j"$(nproc)"
+
+          command -v i686-w64-mingw32-gcc
+          command -v i686-w64-mingw32-g++
+
+          make win32r \
+            AR=/mingw32/bin/i686-w64-mingw32-ar \
+            CC=/mingw32/bin/i686-w64-mingw32-gcc \
+            CXX=/mingw32/bin/i686-w64-mingw32-g++ \
+            -j"$(nproc)"
+
           echo "--- 32-bit carla binaries produced ---"
           find bin -iname "*win32*"
 
