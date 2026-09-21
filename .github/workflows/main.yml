@@ -76,6 +76,22 @@ jobs:
             mingw-w64-ucrt-x86_64-sassc
             mingw-w64-ucrt-x86_64-librsvg
             mingw-w64-ucrt-x86_64-gdk-pixbuf2
+            
+      - name: Ensure 32-bit MinGW binutils are installed
+        run: |
+          pacman -S --needed --noconfirm \
+            mingw-w64-i686-binutils \
+            mingw-w64-i686-gcc \
+            mingw-w64-i686-gcc-libs
+
+          export PATH="/mingw32/bin:/ucrt64/bin:$PATH"
+          hash -r
+
+          command -v i686-w64-mingw32-gcc
+          command -v i686-w64-mingw32-g++
+          command -v i686-w64-mingw32-ar
+          i686-w64-mingw32-ar --version
+            
 
       - name: Patch mingw-w64-headers stralign.h bug (ua_wcschr ambiguous declaration)
         run: |
@@ -126,22 +142,27 @@ jobs:
 
       - name: Build Carla 32-bit discovery/bridge tools
         run: |
-          export PATH="/ucrt64/bin:/mingw32/bin:$PATH"
+          export PATH="/mingw32/bin:/ucrt64/bin:$PATH"
           hash -r
 
           cd /c/src/zrythm/subprojects/carla
 
-          command -v i686-w64-mingw32-gcc
-          command -v i686-w64-mingw32-g++
+          CC="$(command -v i686-w64-mingw32-gcc)"
+          CXX="$(command -v i686-w64-mingw32-g++)"
+          AR="$(command -v i686-w64-mingw32-ar)"
+
+          "$CC" --version
+          "$CXX" --version
+          "$AR" --version
 
           make win32r \
-            AR=/mingw32/bin/i686-w64-mingw32-ar \
-            CC=/mingw32/bin/i686-w64-mingw32-gcc \
-            CXX=/mingw32/bin/i686-w64-mingw32-g++ \
+            AR="$AR" \
+            CC="$CC" \
+            CXX="$CXX" \
             -j"$(nproc)"
 
-          echo "--- 32-bit carla binaries produced ---"
           find bin -iname "*win32*"
+
 
       - name: Patch meson.build dbghelp linking bug (upstream oversight)
         run: |
