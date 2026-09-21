@@ -89,8 +89,8 @@ jobs:
 
           command -v i686-w64-mingw32-gcc
           command -v i686-w64-mingw32-g++
-          command -v i686-w64-mingw32-ar
-          i686-w64-mingw32-ar --version
+          command -v ar
+          ar --version
             
 
       - name: Patch mingw-w64-headers stralign.h bug (ua_wcschr ambiguous declaration)
