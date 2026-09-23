@@ -77,20 +77,27 @@ jobs:
             mingw-w64-ucrt-x86_64-librsvg
             mingw-w64-ucrt-x86_64-gdk-pixbuf2
 
-      - name: Pin FluidSynth 2.5.7 for Carla v1 compatibility
+      - name: Install Carla-compatible FluidSynth 2.5.6
         run: |
-          FS_URL="https://repo.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-fluidsynth-2.5.7-1-any.pkg.tar.zst"
-          FS_PKG="/tmp/mingw-w64-ucrt-x86_64-fluidsynth-2.5.7-1-any.pkg.tar.zst"
+          FS_URL="https://mirror.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-fluidsynth-2.5.6-1-any.pkg.tar.zst"
+          FS_PKG="/tmp/mingw-w64-ucrt-x86_64-fluidsynth-2.5.6-1-any.pkg.tar.zst"
+          FS_SHA256="a973712f48cc05ca3c2e2cced63b1dbd30212749ebddde1509e6ae42b40ccd9c"
 
-          curl -L --fail --retry 5 --retry-delay 5 \
-            "$FS_URL" -o "$FS_PKG"
+          curl.exe -L --fail --retry 5 --retry-delay 3 "$FS_URL" -o "$FS_PKG"
+          echo "$FS_SHA256  $FS_PKG" | sha256sum -c -
 
           pacman -U --noconfirm "$FS_PKG"
 
-          echo "--- FluidSynth version ---"
-          pkg-config --modversion fluidsynth
-          pkg-config --variable=libdir fluidsynth
+          echo "=== FluidSynth package ==="
+          pacman -Q mingw-w64-ucrt-x86_64-fluidsynth
+          test "$(pkg-config --modversion fluidsynth)" = "2.5.6"
+          pkg-config --cflags fluidsynth
           pkg-config --libs fluidsynth
+
+          echo "=== Required Carla symbols ==="
+          nm -g /ucrt64/lib/libfluidsynth-3.dll.a | grep -E             'fluid_synth_set_(chorus_on|polyphony|interp_method)' | tee /tmp/fluidsynth-carla-symbols.txt
+
+          test "$(grep -c 'fluid_synth_set_' /tmp/fluidsynth-carla-symbols.txt)" -ge 3
 
       - name: Patch mingw-w64-headers stralign.h bug (ua_wcschr ambiguous declaration)
         run: |
