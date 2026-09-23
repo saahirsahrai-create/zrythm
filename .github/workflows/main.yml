@@ -138,10 +138,10 @@ jobs:
           # import library explicitly.  Do not rely on the bundled/pkg-config
           # -lfluidsynth resolution here.
           test -f /ucrt64/lib/libfluidsynth-3.dll.a
-          test -f /ucrt64/include/fluidsynth/synth.h
+          test -f /ucrt64/include/fluidsynth.h
 
           cat > /tmp/test_fluidsynth_link.c <<'EOF'
-          #include <fluidsynth/synth.h>
+          #include <fluidsynth.h>
           int main(void) {
             fluid_synth_t *s = 0;
             fluid_synth_set_chorus_on(s, 0);
@@ -160,9 +160,15 @@ jobs:
 
           # Force the exact import library into Carla's bridge link.
           BRIDGE_MK="source/bridges-plugin/Makefile"
-          grep -qF 'NATIVE_LINK_FLAGS += /ucrt64/lib/libfluidsynth-3.dll.a' "$BRIDGE_MK" ||             printf '\nNATIVE_BUILD_FLAGS += -I/ucrt64/include\nNATIVE_LINK_FLAGS += /ucrt64/lib/libfluidsynth-3.dll.a\n' >> "$BRIDGE_MK"
-
-          grep -nF 'NATIVE_LINK_FLAGS += /ucrt64/lib/libfluidsynth-3.dll.a' "$BRIDGE_MK"
+          
+          grep -qF \ 'NATIVE_BUILD_FLAGS += -include /ucrt64/include/fluidsynth.h' \ "$BRIDGE_MK" || cat >> "$BRIDGE_MK" <<'EOF'
+          
+          NATIVE_BUILD_FLAGS += -I/ucrt64/include
+          NATIVE_BUILD_FLAGS += -include /ucrt64/include/fluidsynth.h
+          NATIVE_LINK_FLAGS += /ucrt64/lib/libfluidsynth-3.dll.a
+          EOF
+          
+          grep -nE 'NATIVE_(BUILD|LINK)_FLAGS' "$BRIDGE_MK""
 
           make clean
           make -j"$(nproc)"
