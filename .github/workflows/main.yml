@@ -168,7 +168,7 @@ jobs:
           NATIVE_LINK_FLAGS += /ucrt64/lib/libfluidsynth-3.dll.a
           EOF
           
-          grep -nE 'NATIVE_(BUILD|LINK)_FLAGS' "$BRIDGE_MK""
+          grep -nE 'NATIVE_(BUILD|LINK)_FLAGS' "$BRIDGE_MK"
 
           make clean
           make -j"$(nproc)"
