@@ -128,12 +128,46 @@ jobs:
           cd /c/src/zrythm
           meson subprojects download carla || true
 
-      - name: Build & install Carla natively (real UCRT64 DLLs, matching toolchain)
+      - name: Build & install Carla natively (force UCRT64 FluidSynth import library)
         run: |
           cd /c/src/zrythm/subprojects/carla
+
           make msys2fix
+
+          # Carla's Windows bridge must link against the UCRT64 FluidSynth
+          # import library explicitly.  Do not rely on the bundled/pkg-config
+          # -lfluidsynth resolution here.
+          test -f /ucrt64/lib/libfluidsynth-3.dll.a
+          test -f /ucrt64/include/fluidsynth/synth.h
+
+          cat > /tmp/test_fluidsynth_link.c <<'EOF'
+          #include <fluidsynth/synth.h>
+          int main(void) {
+            fluid_synth_t *s = 0;
+            fluid_synth_set_chorus_on(s, 0);
+            fluid_synth_set_polyphony(s, 64);
+            fluid_synth_set_interp_method(s, -1, 7);
+            fluid_synth_set_reverb_on(s, 0);
+            fluid_synth_set_chorus(s, 3, 1.0, 1.0, 1.0, 0);
+            fluid_synth_set_reverb(s, 0.61, 0.61, 0.61, 0.61);
+            return 0;
+          }
+          EOF
+
+          gcc /tmp/test_fluidsynth_link.c             -I/ucrt64/include             /ucrt64/lib/libfluidsynth-3.dll.a             -o /tmp/test_fluidsynth_link.exe
+
+          rm -f /tmp/test_fluidsynth_link.c /tmp/test_fluidsynth_link.exe
+
+          # Force the exact import library into Carla's bridge link.
+          BRIDGE_MK="source/bridges-plugin/Makefile"
+          grep -qF 'NATIVE_LINK_FLAGS += /ucrt64/lib/libfluidsynth-3.dll.a' "$BRIDGE_MK" ||             printf '\nNATIVE_BUILD_FLAGS += -I/ucrt64/include\nNATIVE_LINK_FLAGS += /ucrt64/lib/libfluidsynth-3.dll.a\n' >> "$BRIDGE_MK"
+
+          grep -nF 'NATIVE_LINK_FLAGS += /ucrt64/lib/libfluidsynth-3.dll.a' "$BRIDGE_MK"
+
+          make clean
           make -j"$(nproc)"
           make install PREFIX=/ucrt64
+
           echo "--- installed carla files ---"
           find /ucrt64 -iname "*carla*" 2>/dev/null
 
