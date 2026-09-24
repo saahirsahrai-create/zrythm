@@ -133,6 +133,23 @@ jobs:
             exit 1
           fi
 
+          # Command-line make-variable overrides were NOT enough (same link
+          # failure recurred) - something in this recursive-make tree
+          # (bridges-plugin's own sub-make of source/Makefile.deps.mk) is
+          # re-evaluating $(shell $(PKG_CONFIG) --libs fluidsynth) itself
+          # and getting empty, independent of what's passed on the command
+          # line. Stop relying on propagation entirely: bake the resolved
+          # values directly into source/Makefile.deps.mk as literal text,
+          # so every includer (root, bridges-plugin, bridges-ui, discovery)
+          # reads the same hardcoded, already-correct line - no shell call,
+          # no variable passing, nothing left to fail.
+          DEPS_MK="source/Makefile.deps.mk"
+          grep -n "^FLUIDSYNTH_FLAGS = \|^FLUIDSYNTH_LIBS  = " "$DEPS_MK"
+          sed -i "s|^FLUIDSYNTH_FLAGS = .*|FLUIDSYNTH_FLAGS = $FS_CFLAGS|" "$DEPS_MK"
+          sed -i "s|^FLUIDSYNTH_LIBS  = .*|FLUIDSYNTH_LIBS  = $FS_LIBS|" "$DEPS_MK"
+          echo "--- patched Makefile.deps.mk ---"
+          grep -n "^FLUIDSYNTH_FLAGS = \|^FLUIDSYNTH_LIBS  = " "$DEPS_MK"
+
           make msys2fix
           make -j"$(nproc)" FLUIDSYNTH_FLAGS="$FS_CFLAGS" FLUIDSYNTH_LIBS="$FS_LIBS"
           make install PREFIX=/ucrt64 FLUIDSYNTH_FLAGS="$FS_CFLAGS" FLUIDSYNTH_LIBS="$FS_LIBS"
