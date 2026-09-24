@@ -111,9 +111,31 @@ jobs:
         run: |
           cd /c/src/zrythm/subprojects/carla
           pkg-config --exists fluidsynth && echo "fluidsynth found: $(pkg-config --modversion fluidsynth)" || (echo "FATAL: fluidsynth not found by pkg-config - SF2 support will be silently compiled out"; exit 1)
+
+          # Force-resolve fluidsynth cflags/libs ourselves and pass them as
+          # make command-line variable overrides. GNU make command-line
+          # variables win over the '=' assignments in Makefile.deps.mk
+          # (FLUIDSYNTH_FLAGS/FLUIDSYNTH_LIBS = $(shell pkg-config ...)) and
+          # DO propagate into every recursive sub-make (backend,
+          # bridges-plugin, bridges-ui, discovery...). This is needed
+          # because the plain `make -j` run linked CarlaPluginFluidSynth.cpp
+          # fine (HAVE_FLUIDSYNTH was defined, so it compiled) but then
+          # failed at link time on bridges-plugin with "undefined reference
+          # to __imp_fluid_*", including basic symbols like
+          # delete_fluid_synth - proof FLUIDSYNTH_LIBS came back empty in
+          # that sub-make's own pkg-config re-evaluation.
+          FS_CFLAGS="$(pkg-config --cflags fluidsynth)"
+          FS_LIBS="$(pkg-config --libs fluidsynth)"
+          echo "FLUIDSYNTH_FLAGS=$FS_CFLAGS"
+          echo "FLUIDSYNTH_LIBS=$FS_LIBS"
+          if [ -z "$FS_LIBS" ]; then
+            echo "FATAL: pkg-config --libs fluidsynth returned empty - cannot link"
+            exit 1
+          fi
+
           make msys2fix
-          make -j"$(nproc)"
-          make install PREFIX=/ucrt64
+          make -j"$(nproc)" FLUIDSYNTH_FLAGS="$FS_CFLAGS" FLUIDSYNTH_LIBS="$FS_LIBS"
+          make install PREFIX=/ucrt64 FLUIDSYNTH_FLAGS="$FS_CFLAGS" FLUIDSYNTH_LIBS="$FS_LIBS"
           echo "--- installed carla files ---"
           find /ucrt64 -iname "*carla*" 2>/dev/null
           echo "--- confirming SF2/fluidsynth support was actually compiled in ---"
