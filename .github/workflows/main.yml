@@ -126,8 +126,24 @@ jobs:
           # that sub-make's own pkg-config re-evaluation.
           FS_CFLAGS="$(pkg-config --cflags fluidsynth)"
           FS_LIBS="$(pkg-config --libs fluidsynth)"
-          echo "FLUIDSYNTH_FLAGS=$FS_CFLAGS"
-          echo "FLUIDSYNTH_LIBS=$FS_LIBS"
+          echo "pkg-config reported: FLUIDSYNTH_FLAGS=$FS_CFLAGS  FLUIDSYNTH_LIBS=$FS_LIBS"
+
+          # pkg-config's own values have now caused the exact same
+          # "undefined reference to __imp_fluid_*" link failure twice in a
+          # row, even after baking its output directly into
+          # Makefile.deps.mk - so stop trusting pkg-config's shell output
+          # entirely. MSYS2's fluidsynth package installs to a fixed,
+          # verifiable layout (headers at /ucrt64/include, import lib +
+          # runtime dll at /ucrt64/lib and /ucrt64/bin respectively).
+          # Confirm those exact files exist, then hardcode the flags from
+          # that known-good layout instead of any shell substitution.
+          echo "--- verifying actual installed fluidsynth files ---"
+          ls -la /ucrt64/include/fluidsynth.h
+          ls -la /ucrt64/lib/libfluidsynth.dll.a 2>/dev/null || ls -la /ucrt64/lib/libfluidsynth*.a
+          ls -la /ucrt64/bin/libfluidsynth*.dll
+          FS_CFLAGS="-I/ucrt64/include"
+          FS_LIBS="-L/ucrt64/lib -lfluidsynth"
+          echo "using hardcoded: FLUIDSYNTH_FLAGS=$FS_CFLAGS  FLUIDSYNTH_LIBS=$FS_LIBS"
           if [ -z "$FS_LIBS" ]; then
             echo "FATAL: pkg-config --libs fluidsynth returned empty - cannot link"
             exit 1
