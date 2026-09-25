@@ -139,11 +139,20 @@ jobs:
           # that known-good layout instead of any shell substitution.
           echo "--- verifying actual installed fluidsynth files ---"
           ls -la /ucrt64/include/fluidsynth.h
-          ls -la /ucrt64/lib/libfluidsynth.dll.a 2>/dev/null || ls -la /ucrt64/lib/libfluidsynth*.a
+          ls -la /ucrt64/lib/libfluidsynth.dll.a 2>/dev/null || echo "(no import lib - expected, MSYS2 fluidsynth ships DLL only)"
           ls -la /ucrt64/bin/libfluidsynth*.dll
+
+          # ld confirmed: "cannot find -lfluidsynth ... have you installed
+          # the static version of the fluidsynth library?" - MSYS2's
+          # fluidsynth package ships ONLY libfluidsynth-3.dll (no
+          # libfluidsynth.dll.a / libfluidsynth.a import lib at all), so
+          # -lfluidsynth can never resolve no matter what -L path is given.
+          # GNU ld can link directly against a DLL by its exact filename
+          # using -l:name instead of -lname (which would search for
+          # lib<name>.a / lib<name>.dll.a and fail the same way).
           FS_CFLAGS="-I/ucrt64/include"
-          FS_LIBS="-L/ucrt64/lib -lfluidsynth"
-          echo "using hardcoded: FLUIDSYNTH_FLAGS=$FS_CFLAGS  FLUIDSYNTH_LIBS=$FS_LIBS"
+          FS_LIBS="-L/ucrt64/bin -l:libfluidsynth-3.dll"
+          echo "using hardcoded direct-DLL link: FLUIDSYNTH_FLAGS=$FS_CFLAGS  FLUIDSYNTH_LIBS=$FS_LIBS"
           if [ -z "$FS_LIBS" ]; then
             echo "FATAL: pkg-config --libs fluidsynth returned empty - cannot link"
             exit 1
